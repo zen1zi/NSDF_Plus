@@ -3,6 +3,23 @@
     
     console.log('[DF助手] levelTag 模块开始加载');
 
+    const resolveSiteUrl = (path) => {
+        if (window.DF && typeof window.DF.getSiteUrl === 'function') {
+            return window.DF.getSiteUrl(path);
+        }
+
+        if (typeof path !== 'string' || path.length === 0) {
+            return window.location.origin;
+        }
+
+        if (/^https?:\/\//i.test(path)) {
+            return path;
+        }
+
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${window.location.origin}${normalizedPath}`;
+    };
+
     const NSLevelTag = {
         id: 'levelTag',
         name: '等级标签',
@@ -128,7 +145,7 @@
                     this.processingUsers.add(userId);
                     console.log(`[DF助手] 获取用户数据: ${userId}`);
                     
-                    const response = await fetch(`https://www.deepflood.com/api/account/getInfo/${userId}`, {
+                    const response = await fetch(resolveSiteUrl(`/api/account/getInfo/${userId}`), {
                         method: 'GET',
                         credentials: 'include',
                         headers: {

@@ -3,6 +3,23 @@
     
     console.log('[DF助手] contentPreview 模块开始加载');
 
+    const resolveSiteUrl = (path) => {
+        if (window.DF && typeof window.DF.getSiteUrl === 'function') {
+            return window.DF.getSiteUrl(path);
+        }
+
+        if (typeof path !== 'string' || path.length === 0) {
+            return window.location.origin;
+        }
+
+        if (/^https?:\/\//i.test(path)) {
+            return path;
+        }
+
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${window.location.origin}${normalizedPath}`;
+    };
+
     const NSContentPreview = {
         id: 'contentPreview',
         name: '内容预览',
@@ -62,7 +79,7 @@
         utils: {
             async fetchPostContent(postId, container, toggleBtn, statusSpan, page = 1) {
                 return new Promise((resolve, reject) => {
-                    const fullUrl = `https://www.deepflood.com/post-${postId}-${page}`;
+                    const fullUrl = resolveSiteUrl(`post-${postId}-${page}`);
                     const showComments = GM_getValue('df_content_preview_show_comments', true);
 
                     GM_xmlhttpRequest({

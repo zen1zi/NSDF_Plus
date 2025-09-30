@@ -1,11 +1,14 @@
 // ==UserScript==
-// @name         DeepFlood+ 助手
+// @name         NSDF 助手
 // @namespace    https://www.deepflood.com/
 // @version      0.1.0
-// @description  DeepFlood 论坛增强脚本（基于 NSaide 改造）
+// @description  DeepFlood & NodeSeek 论坛增强脚本（基于 NSaide 改造）
 // @author       
 // @license      GPL-3.0
 // @match        https://www.deepflood.com/*
+// @match        https://deepflood.com/*
+// @match        https://www.nodeseek.com/*
+// @match        https://nodeseek.com/*
 // @icon         https://www.deepflood.com/favicon.ico
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -21,6 +24,29 @@
     'use strict';
 
     console.log('[DF助手] 脚本开始加载');
+
+    const HOST_SITE_MAP = {
+        'www.deepflood.com': { id: 'deepflood', name: 'DeepFlood' },
+        'deepflood.com': { id: 'deepflood', name: 'DeepFlood' },
+        'www.nodeseek.com': { id: 'nodeseek', name: 'NodeSeek' },
+        'nodeseek.com': { id: 'nodeseek', name: 'NodeSeek' }
+    };
+
+    const currentHost = window.location.host;
+    const siteMeta = HOST_SITE_MAP[currentHost] || { id: 'unknown', name: currentHost };
+    const siteInfo = Object.freeze({
+        ...siteMeta,
+        host: currentHost,
+        origin: window.location.origin,
+        isDeepFlood: siteMeta.id === 'deepflood',
+        isNodeSeek: siteMeta.id === 'nodeseek'
+    });
+
+    if (siteInfo.id === 'unknown') {
+        console.warn('[DF助手] 检测到未配置站点，尝试按当前域名加载');
+    } else {
+        console.log(`[DF助手] 当前站点: ${siteInfo.name} (${siteInfo.host})`);
+    }
 
     const CONFIG_URL = 'https://raw.githubusercontent.com/zen1zi/DeepFloodPlus/main/modules/config.json';
     const CACHE_EXPIRY = 30 * 60 * 1000;
@@ -113,6 +139,7 @@
             version: GM_info.script.version,
             modules: new Map(),
             isReady: false,
+            site: siteInfo,
 
             registerModule(moduleDefinition) {
                 if (!moduleDefinition || !moduleDefinition.id || !moduleDefinition.init) return;
@@ -148,6 +175,19 @@
                     console.log('[DF助手] 所有模块初始化完成');
                 });
             }
+        };
+
+        window.DF.getSiteUrl = (path = '') => {
+            if (typeof path !== 'string' || path.length === 0) {
+                return window.DF.site.origin;
+            }
+
+            if (/^https?:\/\//i.test(path)) {
+                return path;
+            }
+
+            const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+            return `${window.DF.site.origin}${normalizedPath}`;
         };
 
         window.DFRegisterModule = (moduleDefinition) => {

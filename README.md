@@ -1,6 +1,6 @@
-# DeepFlood+ 助手
+# NSDF 助手
 
-Tampermonkey 增强脚本，针对 [DeepFlood 论坛](https://www.deepflood.com) 的常用操作进行了模块化增强。项目基于 NodeSeek 平台的 NSaide 改造，保留了原有的模块框架，同时将域名、缓存前缀和资源指向 DeepFlood，方便后续独立维护与扩展。
+Tampermonkey 增强脚本，同时支持 [DeepFlood 论坛](https://www.deepflood.com) 与 [NodeSeek 社区](https://www.nodeseek.com) 的常用操作增强。项目基于 NodeSeek 平台的 NSaide 改造，保留模块化框架，并针对两个站点统一配置与缓存策略，方便后续独立维护与扩展。
 
 ## ✨ 特性概览
 - **模块化加载**：入口脚本 `main.js` 会读取线上配置 `modules/config.json`，按需拉取各功能模块。
@@ -27,9 +27,9 @@ DeepFloodPlus/
 1. 将 `DeepFloodPlus` 作为独立仓库托管（例如 GitHub）。
 2. 确认 `main.js` 中 `CONFIG_URL` 与 `modules/config.json` 指向你的仓库 RAW 地址（默认已配置为 zen1zi 账户）。
 3. 把 `modules/` 下的脚本和样式同步到同一仓库，保证 Tampermonkey 可以访问。
-4. 在 Tampermonkey 中导入 `main.js`，访问 DeepFlood 任意页面验证模块是否加载。
+4. 在 Tampermonkey 中导入 `main.js`，访问 DeepFlood 或 NodeSeek 任意页面验证模块是否加载。
 
-> ⚠️ 若 DeepFlood 的接口路径与 NodeSeek 存在差异，请在相应模块中调整 `fetch` 的 URL。已将所有跨站请求占位为 `https://www.deepflood.com/...` 或相对路径，便于统一修改。
+> ⚠️ 若两个站点的接口路径存在差异，请在相应模块中通过 `window.DF.getSiteUrl` 调整请求路径，确保兼容性。
 
 ## 🔧 自定义与扩展
 - 新增模块：在 `modules/<id>/` 创建脚本与 README，并在 `modules/config.json` 注册。
@@ -42,4 +42,4 @@ DeepFloodPlus/
 - 对自动签到、内容预览等模块，建议在测试账号上验证接口兼容性。
 
 ## 🙏 致谢
-原项目 [NSaide](https://github.com/stardeep925/NSaide) 提供了成熟的模块化框架。本仓库在其基础上适配 DeepFlood，欢迎继续贡献改进。
+原项目 [NSaide](https://github.com/stardeep925/NSaide) 提供了成熟的模块化框架。本仓库在其基础上同时适配 DeepFlood 与 NodeSeek，欢迎继续贡献改进。

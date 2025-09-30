@@ -3,6 +3,23 @@
 
     console.log('[DF助手] userCard 模块开始加载');
 
+    const resolveSiteUrl = (path) => {
+        if (window.DF && typeof window.DF.getSiteUrl === 'function') {
+            return window.DF.getSiteUrl(path);
+        }
+
+        if (typeof path !== 'string' || path.length === 0) {
+            return window.location.origin;
+        }
+
+        if (/^https?:\/\//i.test(path)) {
+            return path;
+        }
+
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return `${window.location.origin}${normalizedPath}`;
+    };
+
     const NSUserCard = {
         id: 'userCard',
         name: '用户卡片增强',
@@ -93,7 +110,7 @@
             async blockUser(userName) {
                 console.log('[DF助手] 尝试屏蔽用户:', userName);
                 try {
-                    const response = await fetch('https://www.deepflood.com/api/block-list/add', {
+                    const response = await fetch(resolveSiteUrl('/api/block-list/add'), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -165,7 +182,7 @@
                     }
 
                     console.log(`[DF助手] 获取用户数据: ${userId}`);
-                    const response = await fetch(`https://www.deepflood.com/api/account/getInfo/${userId}`, {
+                    const response = await fetch(resolveSiteUrl(`/api/account/getInfo/${userId}`), {
                         method: 'GET',
                         credentials: 'include',
                         headers: {
