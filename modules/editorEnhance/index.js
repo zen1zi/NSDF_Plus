@@ -261,7 +261,7 @@
                 console.log('[DF助手] 开始加载编辑器增强样式');
                 GM_xmlhttpRequest({
                     method: 'GET',
-                    url: 'https://raw.githubusercontent.com/zen1zi/DeepFloodPlus/main/modules/editorEnhance/style.css',
+                    url: 'https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/editorEnhance/style.css',
                     onload: (response) => {
                         if (response.status === 200) {
                             console.log('[DF助手] 编辑器增强样式加载成功');

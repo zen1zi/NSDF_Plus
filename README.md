@@ -10,7 +10,7 @@ Tampermonkey 增强脚本，同时支持 [DeepFlood 论坛](https://www.deepfloo
 
 ## 📁 项目结构
 ```
-DeepFloodPlus/
+NSDF_Plus/
 ├── main.js                // Tampermonkey 入口脚本
 ├── modules/
 │   ├── config.json        // 远程模块清单（需同步到线上）
@@ -24,7 +24,7 @@ DeepFloodPlus/
 ```
 
 ## 🚀 快速上手
-1. 将 `DeepFloodPlus` 作为独立仓库托管（例如 GitHub）。
+1. 将 `NSDF_Plus` 作为独立仓库托管（例如 GitHub）。
 2. 确认 `main.js` 中 `CONFIG_URL` 与 `modules/config.json` 指向你的仓库 RAW 地址（默认已配置为 zen1zi 账户）。
 3. 把 `modules/` 下的脚本和样式同步到同一仓库，保证 Tampermonkey 可以访问。
 4. 在 Tampermonkey 中导入 `main.js`，访问 DeepFlood 或 NodeSeek 任意页面验证模块是否加载。

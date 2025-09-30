@@ -48,7 +48,7 @@
         console.log(`[DF助手] 当前站点: ${siteInfo.name} (${siteInfo.host})`);
     }
 
-    const CONFIG_URL = 'https://raw.githubusercontent.com/zen1zi/DeepFloodPlus/main/modules/config.json';
+    const CONFIG_URL = 'https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/config.json';
     const CACHE_EXPIRY = 30 * 60 * 1000;
     const CACHE_KEY_PREFIX = 'df_module_cache_';
     const CONFIG_CACHE_KEY = 'df_config_cache';

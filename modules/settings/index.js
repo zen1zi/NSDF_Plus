@@ -564,7 +564,7 @@
 
             GM_xmlhttpRequest({
                 method: 'GET',
-                url: 'https://raw.githubusercontent.com/zen1zi/DeepFloodPlus/main/modules/settings/style.css',
+                url: 'https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/settings/style.css',
                 onload: (response) => {
                     if (response.status === 200) {
                         console.log('[DF助手] 设置面板样式加载成功');
