@@ -372,11 +372,12 @@
                     moduleTitle.className = 'ns-settings-module-title';
                     moduleTitle.textContent = module.name;
                     
+                    const enabledKey = module.enabledStorageKey || `module_${module.id}_enabled`;
                     const moduleSwitch = NSSettings.components.createSwitch(
-                        `module_${module.id}_enabled`,
+                        enabledKey,
                         module.enabled,
                         (checked) => {
-                            NSSettings.settingsCache.set(`module_${module.id}_enabled`, checked);
+                            NSSettings.settingsCache.set(enabledKey, checked);
                             NSSettings.needsSave = true;
                             document.querySelector('.ns-settings-save-bar').classList.add('ns-settings-save-bar-active');
                         }

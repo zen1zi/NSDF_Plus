@@ -13,9 +13,11 @@
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
+// @grant        GM_deleteValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
 // @grant        GM_unregisterMenuCommand
+// @grant        GM_listValues
 // @grant        GM_info
 // @grant        unsafeWindow
 // @run-at       document-start
@@ -52,10 +54,24 @@
     const CACHE_EXPIRY = 30 * 60 * 1000;
     const CACHE_KEY_PREFIX = 'df_module_cache_';
     const CONFIG_CACHE_KEY = 'df_config_cache';
+    const MODULE_ENABLED_KEY_PREFIX = 'df_MODULE_ENABLED_';
+    const LEGACY_MODULE_ENABLED_KEY_PREFIX = 'module_';
+    const LEGACY_MODULE_ENABLED_KEY_SUFFIX = '_enabled';
+
+    const normalizeModuleIdForKey = (id) => {
+        if (typeof id !== 'string') {
+            return '';
+        }
+
+        return id
+            .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+            .replace(/[^a-z0-9]/gi, '_')
+            .toUpperCase();
+    };
 
     const getCachedData = (key) => {
         const cached = GM_getValue(key);
-        if (!cached) {
+        if (typeof cached !== 'string' || cached.length === 0) {
             console.log(`[DF助手] 缓存未命中: ${key}`);
             return null;
         }
@@ -65,14 +81,14 @@
             const age = Date.now() - timestamp;
             if (age > CACHE_EXPIRY) {
                 console.log(`[DF助手] 缓存已过期: ${key} (${Math.round(age / 1000)}s 前)`);
-                GM_setValue(key, '');
+                deleteCachedData(key, { silent: true });
                 return null;
             }
             console.log(`[DF助手] 缓存命中: ${key} (${Math.round(age / 1000)}s 前)`);
             return data;
         } catch (error) {
             console.warn(`[DF助手] 缓存数据解析失败: ${key}`, error);
-            GM_setValue(key, '');
+            deleteCachedData(key, { silent: true });
             return null;
         }
     };
@@ -86,6 +102,17 @@
             console.log(`[DF助手] 缓存已保存: ${key}`);
         } catch (error) {
             console.error(`[DF助手] 缓存保存失败: ${key}`, error);
+        }
+    };
+
+    const deleteCachedData = (key, { silent = false } = {}) => {
+        try {
+            GM_deleteValue(key);
+            if (!silent) {
+                console.log(`[DF助手] 缓存已清理: ${key}`);
+            }
+        } catch (error) {
+            console.error(`[DF助手] 缓存清理失败: ${key}`, error);
         }
     };
 
@@ -193,7 +220,7 @@
             console.error(`[DF助手] 模块 ${moduleInfo.name} 加载失败:`, error);
 
             // 尝试从缓存中清除损坏的模块
-            GM_setValue(cacheKey, '');
+            deleteCachedData(cacheKey, { silent: true });
             console.log(`[DF助手] 已清理损坏的模块缓存: ${moduleInfo.id}`);
 
             throw error;
@@ -210,9 +237,43 @@
             registerModule(moduleDefinition) {
                 if (!moduleDefinition || !moduleDefinition.id || !moduleDefinition.init) return;
 
+                const normalizedId = normalizeModuleIdForKey(moduleDefinition.id);
+                const enabledKey = `${MODULE_ENABLED_KEY_PREFIX}${normalizedId}`;
+                let enabled = GM_getValue(enabledKey);
+
+                if (typeof enabled === 'undefined') {
+                    const legacyKey = `${LEGACY_MODULE_ENABLED_KEY_PREFIX}${moduleDefinition.id}${LEGACY_MODULE_ENABLED_KEY_SUFFIX}`;
+                    const legacyValue = GM_getValue(legacyKey);
+
+                    if (typeof legacyValue !== 'undefined') {
+                        enabled = legacyValue;
+                        try {
+                            GM_setValue(enabledKey, legacyValue);
+                            GM_deleteValue(legacyKey);
+                            console.log(`[DF助手] 已迁移模块启用状态: ${moduleDefinition.id}`);
+                        } catch (migrationError) {
+                            console.warn(`[DF助手] 模块启用状态迁移失败: ${moduleDefinition.id}`, migrationError);
+                        }
+                    } else {
+                        enabled = true;
+                        try {
+                            GM_setValue(enabledKey, enabled);
+                        } catch (error) {
+                            console.warn(`[DF助手] 默认写入模块启用状态失败: ${moduleDefinition.id}`, error);
+                        }
+                    }
+                }
+
+                if (typeof enabled === 'string') {
+                    enabled = enabled.toLowerCase() === 'true';
+                } else {
+                    enabled = Boolean(enabled);
+                }
+
                 const module = {
                     ...moduleDefinition,
-                    enabled: GM_getValue(`module_${moduleDefinition.id}_enabled`, true)
+                    enabled: enabled,
+                    enabledStorageKey: enabledKey
                 };
 
                 this.modules.set(moduleDefinition.id, module);
@@ -264,6 +325,7 @@
         window.DF.cache = {
             get: getCachedData,
             set: setCachedData,
+            delete: deleteCachedData,
             fetch: fetchWithCache,
             expiry: CACHE_EXPIRY,
             keyPrefix: CACHE_KEY_PREFIX
@@ -272,29 +334,38 @@
         // 开发者工具
         window.DF.dev = {
             clearCache() {
-                const keys = [];
-                // 清理所有 df_ 前缀的缓存
-                for (let i = 0; i < 1000; i++) {
-                    const key = `df_module_cache_${i}`;
-                    if (GM_getValue(key)) {
-                        GM_setValue(key, '');
-                        keys.push(key);
-                    }
+                const removedKeys = [];
+
+                try {
+                    const storedKeys = GM_listValues();
+                    storedKeys.forEach((key) => {
+                        if (key === CONFIG_CACHE_KEY || key.startsWith(CACHE_KEY_PREFIX)) {
+                            deleteCachedData(key, { silent: true });
+                            removedKeys.push(key);
+                        }
+                    });
+                } catch (error) {
+                    console.error('[DF助手] 遍历缓存键失败:', error);
                 }
-                GM_setValue(CONFIG_CACHE_KEY, '');
-                keys.push(CONFIG_CACHE_KEY);
-                console.log(`[DF助手] 已清理缓存: ${keys.length} 项`);
-                return keys;
+
+                console.log(`[DF助手] 已清理缓存: ${removedKeys.length} 项`);
+                return removedKeys;
             },
             getCacheInfo() {
                 const info = {};
-                const config = getCachedData(CONFIG_CACHE_KEY);
-                if (config) {
-                    info.config = '已缓存';
+                let storedKeys = [];
+
+                try {
+                    storedKeys = GM_listValues();
+                } catch (error) {
+                    console.error('[DF助手] 获取缓存信息失败:', error);
                 }
+
+                const storedSet = new Set(storedKeys);
+                info.config = storedSet.has(CONFIG_CACHE_KEY) ? '已缓存' : '未缓存';
                 window.DF.modules.forEach((module, id) => {
-                    const cached = getCachedData(`${CACHE_KEY_PREFIX}${id}`);
-                    info[id] = cached ? '已缓存' : '未缓存';
+                    const moduleCacheKey = `${CACHE_KEY_PREFIX}${id}`;
+                    info[id] = storedSet.has(moduleCacheKey) ? '已缓存' : '未缓存';
                 });
                 return info;
             },
@@ -306,7 +377,7 @@
                         name: module.name,
                         enabled: module.enabled,
                         loaded: !!module.init,
-                        cached: !!getCachedData(`${CACHE_KEY_PREFIX}${id}`)
+                        cached: typeof GM_getValue(`${CACHE_KEY_PREFIX}${id}`) === 'string'
                     };
                 });
                 return health;
