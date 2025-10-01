@@ -11,14 +11,19 @@
         config: {
             storage: {
                 STATUS: 'df_signin_status',
-                LAST_DATE: 'df_signin_last_date'
+                LAST_DATE: 'df_signin_last_date',
+                LAST_RUN: 'df_autosignin_last_run',
+                DELAY_RANGE: 'df_autosignin_delay_range'
             },
             modes: {
                 DISABLED: 0,
                 RANDOM: 1,
-                FIXED: 2
+                FIXED: 2,
+                PEAK_AVOIDANCE: 3
             },
             timeout: 10000,
+            defaultDelayRange: { min: 5, max: 30 }, // 默认5-30分钟延迟
+            retryIntervals: [1000, 3000, 5000], // 重试间隔
             errors: {
                 ALREADY_SIGNED: '今天已完成签到，请勿重复操作'
             }
@@ -35,8 +40,30 @@
                     options: [
                         { value: 0, label: '禁用自动签到' },
                         { value: 1, label: '随机签到模式' },
-                        { value: 2, label: '固定签到模式' }
+                        { value: 2, label: '固定签到模式' },
+                        { value: 3, label: '错峰签到模式' }
                     ]
+                },
+                {
+                    id: 'delayRange',
+                    type: 'range',
+                    label: '错峰延迟范围（分钟）',
+                    min: 1,
+                    max: 120,
+                    default: 30,
+                    value: () => GM_getValue('df_autosignin_delay_range', 30),
+                    description: '错峰模式下的随机延迟上限'
+                },
+                {
+                    id: 'status',
+                    type: 'info',
+                    label: '最近签到',
+                    value: () => {
+                        const lastRun = GM_getValue('df_autosignin_last_run');
+                        const lastDate = GM_getValue('df_signin_last_date');
+                        if (!lastRun || !lastDate) return '暂无记录';
+                        return `${lastDate} ${new Date(lastRun).toLocaleTimeString()}`;
+                    }
                 },
                 {
                     id: 'retry',
@@ -45,7 +72,7 @@
                     onClick: async () => {
                         const status = GM_getValue('df_signin_status', 0);
                         if (status === 0) return;
-                        
+
                         GM_setValue('df_signin_last_date', '');
                         await NSAutoSignIn.executeAutoSignIn();
                     }
@@ -55,6 +82,8 @@
             handleChange(settingId, value, settingsManager) {
                 if (settingId === 'mode') {
                     settingsManager.cacheValue('df_signin_status', parseInt(value));
+                } else if (settingId === 'delayRange') {
+                    settingsManager.cacheValue('df_autosignin_delay_range', parseInt(value));
                 }
             }
         },
@@ -145,10 +174,47 @@
 
             if (lastSignDate !== today) {
                 console.log('[DF助手] 开始执行今日签到');
-                await this.performSignIn(status === this.config.modes.RANDOM);
-                GM_setValue(this.config.storage.LAST_DATE, today);
+
+                // 错峰签到模式
+                if (status === this.config.modes.PEAK_AVOIDANCE) {
+                    const delayMinutes = this.calculatePeakAvoidanceDelay();
+                    console.log(`[DF助手] 错峰签到模式，将在${delayMinutes}分钟后执行`);
+                    setTimeout(async () => {
+                        await this.performSignInWithRetry(true);
+                    }, delayMinutes * 60 * 1000);
+                    return;
+                }
+
+                await this.performSignInWithRetry(status === this.config.modes.RANDOM);
             } else {
                 console.log('[DF助手] 今日已签到，跳过');
+            }
+        },
+
+        calculatePeakAvoidanceDelay() {
+            const delayRange = GM_getValue(this.config.storage.DELAY_RANGE, this.config.defaultDelayRange.max);
+            return Math.floor(Math.random() * delayRange) + this.config.defaultDelayRange.min;
+        },
+
+        async performSignInWithRetry(isRandom, maxRetries = 3) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    await this.performSignIn(isRandom);
+                    GM_setValue(this.config.storage.LAST_RUN, Date.now());
+                    GM_setValue(this.config.storage.LAST_DATE, new Date().toLocaleDateString());
+                    return;
+                } catch (error) {
+                    console.error(`[DF助手] 签到失败 (${attempt}/${maxRetries}):`, error);
+
+                    if (attempt < maxRetries) {
+                        const retryDelay = this.config.retryIntervals[attempt - 1] || 5000;
+                        console.log(`[DF助手] ${retryDelay}ms 后重试...`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    } else {
+                        console.error('[DF助手] 签到最终失败，已达到最大重试次数');
+                        this.utils.showToast('签到失败，请稍后手动尝试', 'error');
+                    }
+                }
             }
         },
 
@@ -180,30 +246,53 @@
         },
 
         async sendSignInRequest(isRandom) {
-            const url = `/api/attendance?random=${isRandom}`;
-            console.log('[DF助手] 发送签到请求:', url);
+            // 站点特定的签到接口
+            const endpoints = this.getSignInEndpoints();
+            let lastError = null;
 
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'accept': 'application/json, text/plain, */*',
-                        'content-type': 'application/json',
-                        'x-requested-with': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin'
-                });
+            // 尝试主接口和备用接口
+            for (const endpoint of endpoints) {
+                try {
+                    const url = `${endpoint}?random=${isRandom}`;
+                    console.log('[DF助手] 发送签到请求:', url);
 
-                const data = await response.json();
-                
-                if (!response.ok && !data.message) {
-                    throw new Error(`请求失败: ${response.status}`);
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'accept': 'application/json, text/plain, */*',
+                            'content-type': 'application/json',
+                            'x-requested-with': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok && !data.message) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    console.log('[DF助手] 签到请求成功:', endpoint);
+                    return data;
+                } catch (error) {
+                    console.warn(`[DF助手] 接口 ${endpoint} 失败:`, error.message);
+                    lastError = error;
+                    continue;
                 }
+            }
 
-                return data;
-            } catch (error) {
-                console.error('[DF助手] 请求失败:', error);
-                throw error;
+            console.error('[DF助手] 所有接口都失败了');
+            throw lastError || new Error('所有签到接口都不可用');
+        },
+
+        getSignInEndpoints() {
+            // 根据当前站点返回可用的签到接口
+            if (window.DF.site.isDeepFlood) {
+                return ['/api/attendance', '/api/checkin', '/attendance'];
+            } else if (window.DF.site.isNodeSeek) {
+                return ['/api/attendance', '/api/sign', '/checkin'];
+            } else {
+                return ['/api/attendance', '/api/checkin'];
             }
         }
     };

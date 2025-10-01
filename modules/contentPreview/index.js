@@ -28,7 +28,15 @@
         config: {
             storage: {
                 ENABLED: 'df_content_preview_enabled',
-                SHOW_COMMENTS: 'df_content_preview_show_comments'
+                SHOW_COMMENTS: 'df_content_preview_show_comments',
+                FORMAT_MODE: 'df_content_preview_format_mode',
+                MOBILE_ENABLED: 'df_content_preview_mobile_enabled'
+            },
+            formats: {
+                AUTO: 'auto',
+                MARKDOWN: 'markdown',
+                BBCODE: 'bbcode',
+                HTML: 'html'
             }
         },
 
@@ -47,6 +55,28 @@
                     label: '显示评论区',
                     default: true,
                     value: () => GM_getValue('df_content_preview_show_comments', true)
+                },
+                {
+                    id: 'formatMode',
+                    type: 'select',
+                    label: '内容格式模式',
+                    default: 'auto',
+                    value: () => GM_getValue('df_content_preview_format_mode', 'auto'),
+                    options: [
+                        { value: 'auto', label: '自动识别' },
+                        { value: 'markdown', label: 'Markdown' },
+                        { value: 'bbcode', label: 'BBCode' },
+                        { value: 'html', label: 'HTML' }
+                    ],
+                    description: '选择内容渲染格式，自动模式根据站点特性选择'
+                },
+                {
+                    id: 'mobileEnabled',
+                    type: 'switch',
+                    label: '移动端优化',
+                    default: true,
+                    value: () => GM_getValue('df_content_preview_mobile_enabled', true),
+                    description: '在移动设备上优化预览效果，避免过度占位'
                 }
             ],
             handleChange(settingId, value, settingsManager) {
@@ -72,11 +102,94 @@
                             container.hasContent = false;
                         }
                     });
+                } else if (settingId === 'formatMode') {
+                    GM_setValue('df_content_preview_format_mode', value);
+                } else if (settingId === 'mobileEnabled') {
+                    GM_setValue('df_content_preview_mobile_enabled', value);
                 }
             }
         },
 
         utils: {
+            isMobile() {
+                return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            },
+
+            detectContentFormat(content) {
+                const formatMode = GM_getValue(this.config.storage.FORMAT_MODE, this.config.formats.AUTO);
+
+                if (formatMode !== this.config.formats.AUTO) {
+                    return formatMode;
+                }
+
+                // 自动检测格式
+                if (window.DF.site.isDeepFlood) {
+                    // DeepFlood 通常使用 Markdown
+                    return this.config.formats.MARKDOWN;
+                } else if (window.DF.site.isNodeSeek) {
+                    // NodeSeek 通常使用 BBCode
+                    return this.config.formats.BBCODE;
+                }
+
+                // 基于内容特征判断
+                if (content.includes('[code]') || content.includes('[url=') || content.includes('[img]')) {
+                    return this.config.formats.BBCODE;
+                } else if (content.includes('```') || content.includes('##') || content.includes('[text](url)')) {
+                    return this.config.formats.MARKDOWN;
+                }
+
+                return this.config.formats.HTML;
+            },
+
+            processContentFormat(content, format) {
+                try {
+                    switch (format) {
+                        case this.config.formats.MARKDOWN:
+                            return this.renderMarkdown(content);
+                        case this.config.formats.BBCODE:
+                            return this.renderBBCode(content);
+                        case this.config.formats.HTML:
+                        default:
+                            return content;
+                    }
+                } catch (error) {
+                    console.warn('[DF助手] 内容格式处理失败，使用原始内容:', error);
+                    return content;
+                }
+            },
+
+            renderMarkdown(content) {
+                // 简单的 Markdown 渲染
+                return content
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+                    .replace(/\*(.*)\*/gim, '<em>$1</em>')
+                    .replace(/!\[([^\]]*)\]\(([^\)]*)\)/gim, '<img alt="$1" src="$2" style="max-width: 100%; height: auto;">')
+                    .replace(/\[([^\]]*)\]\(([^\)]*)\)/gim, '<a href="$2" target="_blank">$1</a>')
+                    .replace(/```([^`]*)```/gim, '<pre><code>$1</code></pre>')
+                    .replace(/`([^`]*)`/gim, '<code>$1</code>')
+                    .replace(/^\* (.*$)/gim, '<li>$1</li>')
+                    .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                    .replace(/\n/gim, '<br>');
+            },
+
+            renderBBCode(content) {
+                // 简单的 BBCode 渲染
+                return content
+                    .replace(/\[b\](.*?)\[\/b\]/gim, '<strong>$1</strong>')
+                    .replace(/\[i\](.*?)\[\/i\]/gim, '<em>$1</em>')
+                    .replace(/\[u\](.*?)\[\/u\]/gim, '<u>$1</u>')
+                    .replace(/\[url=([^\]]*)\](.*?)\[\/url\]/gim, '<a href="$1" target="_blank">$2</a>')
+                    .replace(/\[url\](.*?)\[\/url\]/gim, '<a href="$1" target="_blank">$1</a>')
+                    .replace(/\[img\](.*?)\[\/img\]/gim, '<img src="$1" style="max-width: 100%; height: auto;">')
+                    .replace(/\[code\](.*?)\[\/code\]/gims, '<pre><code>$1</code></pre>')
+                    .replace(/\[quote\](.*?)\[\/quote\]/gims, '<blockquote>$1</blockquote>')
+                    .replace(/\[color=([^\]]*)\](.*?)\[\/color\]/gim, '<span style="color: $1">$2</span>')
+                    .replace(/\[size=([^\]]*)\](.*?)\[\/size\]/gim, '<span style="font-size: $1">$2</span>')
+                    .replace(/\n/gim, '<br>');
+            },
             async fetchPostContent(postId, container, toggleBtn, statusSpan, page = 1) {
                 return new Promise((resolve, reject) => {
                     const fullUrl = resolveSiteUrl(`post-${postId}-${page}`);

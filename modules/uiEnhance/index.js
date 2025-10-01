@@ -16,7 +16,16 @@
                 OPACITY_VALUE: 'df_ui_opacity_value',
                 BLUR_ENABLED: 'df_ui_blur_enabled',
                 BLUR_VALUE: 'df_ui_blur_value',
-                TEXT_ENHANCE_ENABLED: 'df_ui_text_enhance_enabled'
+                TEXT_ENHANCE_ENABLED: 'df_ui_text_enhance_enabled',
+                THEME_COLOR: 'df_ui_theme',
+                RESPONSIVE_ENABLED: 'df_ui_responsive_enabled'
+            },
+            themes: {
+                default: { primary: '#007bff', secondary: '#6c757d', accent: '#28a745' },
+                purple: { primary: '#6f42c1', secondary: '#6c757d', accent: '#e83e8c' },
+                green: { primary: '#28a745', secondary: '#6c757d', accent: '#17a2b8' },
+                orange: { primary: '#fd7e14', secondary: '#6c757d', accent: '#dc3545' },
+                custom: { primary: '#007bff', secondary: '#6c757d', accent: '#28a745' }
             }
         },
 
@@ -92,6 +101,27 @@
                     label: '启用文字增强',
                     default: false,
                     value: () => GM_getValue('df_ui_text_enhance_enabled', false)
+                },
+                {
+                    id: 'themeColor',
+                    type: 'select',
+                    label: '主题颜色',
+                    default: 'default',
+                    value: () => GM_getValue('df_ui_theme', 'default'),
+                    options: [
+                        { value: 'default', label: '默认蓝色' },
+                        { value: 'purple', label: '紫色主题' },
+                        { value: 'green', label: '绿色主题' },
+                        { value: 'orange', label: '橙色主题' }
+                    ]
+                },
+                {
+                    id: 'responsiveEnabled',
+                    type: 'switch',
+                    label: '响应式布局优化（NodeSeek）',
+                    default: false,
+                    value: () => GM_getValue('df_ui_responsive_enabled', false),
+                    description: '针对NodeSeek贴子列表的移动端布局优化'
                 }
             ],
             
@@ -136,6 +166,10 @@
                     }
                 } else if (settingId === 'textEnhanceEnabled') {
                     GM_setValue('df_ui_text_enhance_enabled', value);
+                } else if (settingId === 'themeColor') {
+                    GM_setValue('df_ui_theme', value);
+                } else if (settingId === 'responsiveEnabled') {
+                    GM_setValue('df_ui_responsive_enabled', value);
                 }
                 NSUIEnhance.applyStyles();
             }
@@ -150,9 +184,11 @@
             const blurEnabled = GM_getValue(this.config.storage.BLUR_ENABLED, false);
             const blurValue = GM_getValue(this.config.storage.BLUR_VALUE, 10);
             const textEnhanceEnabled = GM_getValue(this.config.storage.TEXT_ENHANCE_ENABLED, false);
+            const themeColor = GM_getValue(this.config.storage.THEME_COLOR, 'default');
+            const responsiveEnabled = GM_getValue(this.config.storage.RESPONSIVE_ENABLED, false);
             const isDarkMode = document.body.classList.contains('dark-layout');
 
-            console.log('[DF助手] 当前设置状态:', { enabled, imageUrl, opacityEnabled, opacityValue, blurEnabled, blurValue, textEnhanceEnabled, isDarkMode });
+            console.log('[DF助手] 当前设置状态:', { enabled, imageUrl, opacityEnabled, opacityValue, blurEnabled, blurValue, textEnhanceEnabled, themeColor, responsiveEnabled, isDarkMode });
 
             const styleId = 'ns-ui-enhance-styles';
             let styleElement = document.getElementById(styleId);
@@ -272,8 +308,128 @@
                 styles += mainElements + specialElements + previewElements + hoverElements + editorElements;
             }
 
+            // 应用主题颜色
+            if (themeColor && themeColor !== 'default') {
+                const theme = this.config.themes[themeColor];
+                if (theme) {
+                    styles += this.generateThemeStyles(theme);
+                }
+            }
+
+            // 应用响应式布局优化 (主要针对NodeSeek)
+            if (responsiveEnabled && window.DF.site.isNodeSeek) {
+                styles += this.generateResponsiveStyles();
+            }
+
             styleElement.textContent = styles;
             console.log('[DF助手] 样式应用完成');
+        },
+
+        generateThemeStyles(theme) {
+            return `
+                /* 主题颜色 */
+                body .btn-primary,
+                body .bg-primary {
+                    background-color: ${theme.primary} !important;
+                    border-color: ${theme.primary} !important;
+                }
+
+                body .btn-secondary,
+                body .bg-secondary {
+                    background-color: ${theme.secondary} !important;
+                    border-color: ${theme.secondary} !important;
+                }
+
+                body .text-primary,
+                body .link-primary {
+                    color: ${theme.primary} !important;
+                }
+
+                body .border-primary {
+                    border-color: ${theme.primary} !important;
+                }
+
+                /* 链接和按钮悬停效果 */
+                body .btn-primary:hover {
+                    background-color: ${this.adjustColor(theme.primary, -20)} !important;
+                    border-color: ${this.adjustColor(theme.primary, -20)} !important;
+                }
+
+                body a:hover {
+                    color: ${this.adjustColor(theme.primary, -10)} !important;
+                }
+
+                /* 活跃状态 */
+                body .nav-link.active,
+                body .nav-item.active .nav-link {
+                    color: ${theme.primary} !important;
+                }
+            `;
+        },
+
+        generateResponsiveStyles() {
+            return `
+                /* NodeSeek 响应式布局优化 */
+                @media (max-width: 768px) {
+                    body .topic-list .topic-item {
+                        padding: 0.5rem !important;
+                        margin-bottom: 0.5rem !important;
+                    }
+
+                    body .topic-list .topic-title {
+                        font-size: 0.9rem !important;
+                        line-height: 1.3 !important;
+                    }
+
+                    body .topic-list .topic-meta {
+                        font-size: 0.8rem !important;
+                        display: flex !important;
+                        flex-wrap: wrap !important;
+                        gap: 0.25rem !important;
+                    }
+
+                    body .post-content img {
+                        max-width: 100% !important;
+                        height: auto !important;
+                    }
+
+                    body .table-responsive {
+                        font-size: 0.85rem !important;
+                    }
+
+                    body .user-card {
+                        max-width: 100% !important;
+                        margin: 0.25rem 0 !important;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    body .topic-list .topic-title {
+                        font-size: 0.85rem !important;
+                    }
+
+                    body .topic-list .topic-meta {
+                        font-size: 0.75rem !important;
+                    }
+
+                    body .btn {
+                        padding: 0.25rem 0.5rem !important;
+                        font-size: 0.8rem !important;
+                    }
+                }
+            `;
+        },
+
+        adjustColor(hex, percent) {
+            // 简单的颜色调整函数
+            const num = parseInt(hex.replace('#', ''), 16);
+            const amt = Math.round(2.55 * percent);
+            const R = (num >> 16) + amt;
+            const G = (num >> 8 & 0x00FF) + amt;
+            const B = (num & 0x0000FF) + amt;
+            return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
         },
 
         init() {
