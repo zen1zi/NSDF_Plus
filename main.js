@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         NSDF 助手
 // @namespace    https://www.deepflood.com/
-// @version      0.1.0
+// @version      0.2.0
 // @description  DeepFlood & NodeSeek 论坛增强脚本（基于 NSaide 改造）
 // @author       
 // @license      GPL-3.0
@@ -55,59 +55,105 @@
 
     const getCachedData = (key) => {
         const cached = GM_getValue(key);
-        if (!cached) return null;
+        if (!cached) {
+            console.log(`[DF助手] 缓存未命中: ${key}`);
+            return null;
+        }
 
         try {
             const { data, timestamp } = JSON.parse(cached);
-            if (Date.now() - timestamp > CACHE_EXPIRY) {
+            const age = Date.now() - timestamp;
+            if (age > CACHE_EXPIRY) {
+                console.log(`[DF助手] 缓存已过期: ${key} (${Math.round(age / 1000)}s 前)`);
                 GM_setValue(key, '');
                 return null;
             }
+            console.log(`[DF助手] 缓存命中: ${key} (${Math.round(age / 1000)}s 前)`);
             return data;
-        } catch {
+        } catch (error) {
+            console.warn(`[DF助手] 缓存数据解析失败: ${key}`, error);
+            GM_setValue(key, '');
             return null;
         }
     };
 
     const setCachedData = (key, data) => {
-        GM_setValue(key, JSON.stringify({
-            data,
-            timestamp: Date.now()
-        }));
+        try {
+            GM_setValue(key, JSON.stringify({
+                data,
+                timestamp: Date.now()
+            }));
+            console.log(`[DF助手] 缓存已保存: ${key}`);
+        } catch (error) {
+            console.error(`[DF助手] 缓存保存失败: ${key}`, error);
+        }
     };
 
-    const fetchWithCache = (url, cacheKey) => {
+    const fetchWithCache = (url, cacheKey, retryCount = 3) => {
         return new Promise((resolve, reject) => {
             const cached = getCachedData(cacheKey);
             if (cached) {
-                console.log(`[DF助手] 使用缓存数据: ${cacheKey}`);
                 resolve(cached);
                 return;
             }
 
-            GM_xmlhttpRequest({
-                method: 'GET',
-                url: `${url}?t=${Date.now()}`,
-                nocache: true,
-                headers: {
-                    'Cache-Control': 'no-cache',
-                    'Pragma': 'no-cache'
-                },
-                onload: (response) => {
-                    if (response.status === 200) {
-                        try {
-                            const data = response.responseText;
-                            setCachedData(cacheKey, data);
-                            resolve(data);
-                        } catch (error) {
+            console.log(`[DF助手] 开始远程获取: ${url}`);
+
+            const attemptFetch = (attempt) => {
+                GM_xmlhttpRequest({
+                    method: 'GET',
+                    url: `${url}?t=${Date.now()}`,
+                    timeout: 10000,
+                    nocache: true,
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    },
+                    onload: (response) => {
+                        if (response.status === 200) {
+                            try {
+                                const data = response.responseText;
+                                setCachedData(cacheKey, data);
+                                console.log(`[DF助手] 远程获取成功: ${url}`);
+                                resolve(data);
+                            } catch (error) {
+                                console.error(`[DF助手] 数据处理失败: ${url}`, error);
+                                reject(error);
+                            }
+                        } else {
+                            const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+                            if (attempt < retryCount) {
+                                console.warn(`[DF助手] 请求失败，重试 ${attempt}/${retryCount}: ${url}`, error.message);
+                                setTimeout(() => attemptFetch(attempt + 1), 1000 * attempt);
+                            } else {
+                                console.error(`[DF助手] 请求最终失败: ${url}`, error);
+                                reject(error);
+                            }
+                        }
+                    },
+                    onerror: (error) => {
+                        if (attempt < retryCount) {
+                            console.warn(`[DF助手] 网络错误，重试 ${attempt}/${retryCount}: ${url}`, error);
+                            setTimeout(() => attemptFetch(attempt + 1), 1000 * attempt);
+                        } else {
+                            console.error(`[DF助手] 网络错误最终失败: ${url}`, error);
                             reject(error);
                         }
-                    } else {
-                        reject(new Error(`请求失败: ${response.status}`));
+                    },
+                    ontimeout: () => {
+                        const error = new Error('请求超时');
+                        if (attempt < retryCount) {
+                            console.warn(`[DF助手] 请求超时，重试 ${attempt}/${retryCount}: ${url}`);
+                            setTimeout(() => attemptFetch(attempt + 1), 1000 * attempt);
+                        } else {
+                            console.error(`[DF助手] 请求超时最终失败: ${url}`);
+                            reject(error);
+                        }
                     }
-                },
-                onerror: reject
-            });
+                });
+            };
+
+            attemptFetch(1);
         });
     };
 
@@ -123,13 +169,33 @@
 
     const loadModule = async (moduleInfo) => {
         const cacheKey = `${CACHE_KEY_PREFIX}${moduleInfo.id}`;
+        const loadStartTime = Date.now();
+
         try {
             console.log(`[DF助手] 开始加载模块: ${moduleInfo.name}`);
             const moduleCode = await fetchWithCache(moduleInfo.url, cacheKey);
+
+            // 检查模块代码安全性 - 简单的恶意代码检测
+            if (moduleCode.includes('eval(') && !moduleCode.includes('// Safe eval')) {
+                console.warn(`[DF助手] 模块 ${moduleInfo.name} 包含可疑代码，跳过加载`);
+                return;
+            }
+
             eval(moduleCode);
-            console.log(`[DF助手] 模块加载成功: ${moduleInfo.name}`);
+            const loadTime = Date.now() - loadStartTime;
+            console.log(`[DF助手] 模块加载成功: ${moduleInfo.name} (${loadTime}ms)`);
+
+            // 记录模块加载性能
+            window.DF.dev.moduleLoadTimes = window.DF.dev.moduleLoadTimes || {};
+            window.DF.dev.moduleLoadTimes[moduleInfo.id] = loadTime;
+
         } catch (error) {
             console.error(`[DF助手] 模块 ${moduleInfo.name} 加载失败:`, error);
+
+            // 尝试从缓存中清除损坏的模块
+            GM_setValue(cacheKey, '');
+            console.log(`[DF助手] 已清理损坏的模块缓存: ${moduleInfo.id}`);
+
             throw error;
         }
     };
@@ -193,20 +259,137 @@
         window.DFRegisterModule = (moduleDefinition) => {
             window.DF.registerModule(moduleDefinition);
         };
+
+        // 缓存工具 - 可供模块使用
+        window.DF.cache = {
+            get: getCachedData,
+            set: setCachedData,
+            fetch: fetchWithCache,
+            expiry: CACHE_EXPIRY,
+            keyPrefix: CACHE_KEY_PREFIX
+        };
+
+        // 开发者工具
+        window.DF.dev = {
+            clearCache() {
+                const keys = [];
+                // 清理所有 df_ 前缀的缓存
+                for (let i = 0; i < 1000; i++) {
+                    const key = `df_module_cache_${i}`;
+                    if (GM_getValue(key)) {
+                        GM_setValue(key, '');
+                        keys.push(key);
+                    }
+                }
+                GM_setValue(CONFIG_CACHE_KEY, '');
+                keys.push(CONFIG_CACHE_KEY);
+                console.log(`[DF助手] 已清理缓存: ${keys.length} 项`);
+                return keys;
+            },
+            getCacheInfo() {
+                const info = {};
+                const config = getCachedData(CONFIG_CACHE_KEY);
+                if (config) {
+                    info.config = '已缓存';
+                }
+                window.DF.modules.forEach((module, id) => {
+                    const cached = getCachedData(`${CACHE_KEY_PREFIX}${id}`);
+                    info[id] = cached ? '已缓存' : '未缓存';
+                });
+                return info;
+            },
+            getModuleHealth() {
+                const health = {};
+                window.DF.modules.forEach((module, id) => {
+                    health[id] = {
+                        id: module.id,
+                        name: module.name,
+                        enabled: module.enabled,
+                        loaded: !!module.init,
+                        cached: !!getCachedData(`${CACHE_KEY_PREFIX}${id}`)
+                    };
+                });
+                return health;
+            }
+        };
     };
 
     const initializeModules = async () => {
-        try {
-            createDF();
-            const config = await loadConfig();
+        const initStartTime = Date.now();
 
-            await Promise.all(config.modules.map(loadModule));
+        try {
+            console.log('[DF助手] 开始初始化模块系统');
+            createDF();
+
+            const config = await loadConfig();
+            console.log(`[DF助手] 配置加载成功，发现 ${config.modules.length} 个模块`);
+
+            // 并行加载模块，但容错处理
+            const moduleLoadPromises = config.modules.map(async (moduleInfo) => {
+                try {
+                    await loadModule(moduleInfo);
+                    return { success: true, module: moduleInfo.id };
+                } catch (error) {
+                    console.error(`[DF助手] 模块 ${moduleInfo.id} 加载失败:`, error);
+                    return { success: false, module: moduleInfo.id, error };
+                }
+            });
+
+            const results = await Promise.all(moduleLoadPromises);
+            const successful = results.filter(r => r.success).length;
+            const failed = results.filter(r => !r.success);
+
+            console.log(`[DF助手] 模块加载完成: ${successful}/${config.modules.length} 成功`);
+
+            if (failed.length > 0) {
+                console.warn('[DF助手] 加载失败的模块:', failed.map(f => f.module));
+            }
 
             if (window.DF.modules.size > 0) {
                 window.DF.init();
+                const initTime = Date.now() - initStartTime;
+                console.log(`[DF助手] 初始化完成 (${initTime}ms)，已加载 ${window.DF.modules.size} 个模块`);
+
+                // 注册菜单命令
+                GM_registerMenuCommand('DF助手 - 打开设置', () => {
+                    const settingsModule = window.DF.modules.get('settings');
+                    if (settingsModule && settingsModule.utils && settingsModule.utils.showSettingsPanel) {
+                        settingsModule.utils.showSettingsPanel();
+                    } else {
+                        console.warn('[DF助手] 设置模块未加载或不可用');
+                    }
+                });
+
+                GM_registerMenuCommand('DF助手 - 清理缓存', () => {
+                    window.DF.dev.clearCache();
+                    alert('缓存已清理，请刷新页面');
+                });
+            } else {
+                console.warn('[DF助手] 没有模块成功加载');
             }
+
         } catch (error) {
             console.error('[DF助手] 初始化失败:', error);
+
+            // 降级处理：尝试只加载设置模块
+            try {
+                console.log('[DF助手] 尝试降级启动...');
+                const fallbackConfig = {
+                    modules: [{
+                        id: 'settings',
+                        name: '设置面板',
+                        url: 'https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/settings/index.js'
+                    }]
+                };
+
+                await loadModule(fallbackConfig.modules[0]);
+                if (window.DF.modules.size > 0) {
+                    window.DF.init();
+                    console.log('[DF助手] 降级启动成功');
+                }
+            } catch (fallbackError) {
+                console.error('[DF助手] 降级启动也失败:', fallbackError);
+            }
         }
     };
 
