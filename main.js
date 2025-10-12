@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         NSDF 助手
 // @namespace    https://www.deepflood.com/
-// @version      0.2.0
+// @version      0.2.1
 // @description  DeepFlood & NodeSeek 论坛增强脚本（基于 NSaide 改造）
-// @author       
+// @author       zenitsu
 // @license      GPL-3.0
 // @match        https://www.deepflood.com/*
 // @match        https://deepflood.com/*
