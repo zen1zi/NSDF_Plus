@@ -11,8 +11,8 @@
         config: {
             storage: {
                 STATUS: 'df_signin_status',
-                LAST_DATE: 'df_signin_last_date',
-                LAST_RUN: 'df_autosignin_last_run',
+                LAST_DATE_PREFIX: 'df_signin_last_date',
+                LAST_RUN_PREFIX: 'df_autosignin_last_run',
                 DELAY_RANGE: 'df_autosignin_delay_range'
             },
             modes: {
@@ -59,8 +59,9 @@
                     type: 'info',
                     label: '最近签到',
                     value: () => {
-                        const lastRun = GM_getValue('df_autosignin_last_run');
-                        const lastDate = GM_getValue('df_signin_last_date');
+                        const siteId = window.DF.site.id;
+                        const lastRun = GM_getValue(`df_autosignin_last_run_${siteId}`);
+                        const lastDate = GM_getValue(`df_signin_last_date_${siteId}`);
                         if (!lastRun || !lastDate) return '暂无记录';
                         return `${lastDate} ${new Date(lastRun).toLocaleTimeString()}`;
                     }
@@ -73,7 +74,8 @@
                         const status = GM_getValue('df_signin_status', 0);
                         if (status === 0) return;
 
-                        GM_setValue('df_signin_last_date', '');
+                        const siteId = window.DF.site.id;
+                        GM_setValue(`df_signin_last_date_${siteId}`, '');
                         await NSAutoSignIn.executeAutoSignIn();
                     }
                 }
@@ -132,11 +134,16 @@
                 toast.className = `ns-signin-toast ns-signin-toast-${type}`;
                 toast.textContent = message;
                 document.body.appendChild(toast);
-                
+
                 setTimeout(() => {
                     toast.classList.add('ns-signin-toast-fade-out');
                     setTimeout(() => toast.remove(), 300);
                 }, 3000);
+            },
+
+            getStorageKey(prefix) {
+                const siteId = window.DF.site.id;
+                return `${prefix}_${siteId}`;
             }
         },
 
@@ -167,10 +174,12 @@
             }
 
             const today = new Date().toLocaleDateString();
-            const lastSignDate = GM_getValue(this.config.storage.LAST_DATE);
+            const lastDateKey = this.utils.getStorageKey(this.config.storage.LAST_DATE_PREFIX);
+            const lastSignDate = GM_getValue(lastDateKey);
 
             console.log('[DF助手] 上次签到日期:', lastSignDate);
             console.log('[DF助手] 当前日期:', today);
+            console.log('[DF助手] 当前站点:', window.DF.site.id);
 
             if (lastSignDate !== today) {
                 console.log('[DF助手] 开始执行今日签到');
@@ -200,8 +209,10 @@
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
                 try {
                     await this.performSignIn(isRandom);
-                    GM_setValue(this.config.storage.LAST_RUN, Date.now());
-                    GM_setValue(this.config.storage.LAST_DATE, new Date().toLocaleDateString());
+                    const lastRunKey = this.utils.getStorageKey(this.config.storage.LAST_RUN_PREFIX);
+                    const lastDateKey = this.utils.getStorageKey(this.config.storage.LAST_DATE_PREFIX);
+                    GM_setValue(lastRunKey, Date.now());
+                    GM_setValue(lastDateKey, new Date().toLocaleDateString());
                     return;
                 } catch (error) {
                     console.error(`[DF助手] 签到失败 (${attempt}/${maxRetries}):`, error);
@@ -225,15 +236,17 @@
 
                 const response = await this.sendSignInRequest(isRandom);
                 console.log('[DF助手] 签到响应:', response);
-                
+
+                const lastDateKey = this.utils.getStorageKey(this.config.storage.LAST_DATE_PREFIX);
+
                 if (response.success) {
                     console.log(`[DF助手] 签到成功！获得${response.gain}个鸡腿，当前共有${response.current}个鸡腿`);
                     this.utils.showToast(`签到成功！获得${response.gain}个鸡腿`, 'success');
-                    GM_setValue(this.config.storage.LAST_DATE, new Date().toLocaleDateString());
+                    GM_setValue(lastDateKey, new Date().toLocaleDateString());
                 } else if (response.message === this.config.errors.ALREADY_SIGNED) {
                     console.log('[DF助手] 今日已签到');
                     this.utils.showToast('今日已签到', 'info');
-                    GM_setValue(this.config.storage.LAST_DATE, new Date().toLocaleDateString());
+                    GM_setValue(lastDateKey, new Date().toLocaleDateString());
                 } else {
                     console.log('[DF助手] 签到失败:', response.message);
                     this.utils.showToast(`签到失败: ${response.message}`, 'error');
