@@ -1,52 +1,52 @@
 {
-    "version": "0.2.1",
-    "lastUpdated": "2025-01-15T00:00:00Z",
-    "checksum": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "modules": [
-        {
-            "name": "设置面板",
-            "id": "settings",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/settings/index.js"
-        },
-        {
-            "name": "用户卡片增强",
-            "id": "userCard",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/userCard/index.js"
-        },
-        {
-            "name": "编辑器增强",
-            "id": "editorEnhance",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/editorEnhance/index.js"
-        },
-        {
-            "name": "自动签到",
-            "id": "autoSignIn",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/autoSignIn/index.js"
-        },
-        {
-            "name": "UI 美化",
-            "id": "uiEnhance",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/uiEnhance/index.js"
-        },
-        {
-            "name": "自动翻页",
-            "id": "autoPage",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/autoPage/index.js"
-        },
-        {
-            "name": "等级标签",
-            "id": "levelTag",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/levelTag/index.js"
-        },
-        {
-            "name": "快捷回复",
-            "id": "quickReply",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/quickReply/index.js"
-        },
-        {
-            "name": "内容预览",
-            "id": "contentPreview",
-            "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/contentPreview/index.js"
-        }
-    ]
+  "version": "0.2.2",
+  "lastUpdated": "2025-10-16T00:00:00Z",
+  "checksum": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "modules": [
+    {
+      "name": "设置面板",
+      "id": "settings",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/settings/index.js"
+    },
+    {
+      "name": "用户卡片增强",
+      "id": "userCard",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/userCard/index.js"
+    },
+    {
+      "name": "编辑器增强",
+      "id": "editorEnhance",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/editorEnhance/index.js"
+    },
+    {
+      "name": "自动签到",
+      "id": "autoSignIn",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/autoSignIn/index.js"
+    },
+    {
+      "name": "UI 美化",
+      "id": "uiEnhance",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/uiEnhance/index.js"
+    },
+    {
+      "name": "自动翻页",
+      "id": "autoPage",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/autoPage/index.js"
+    },
+    {
+      "name": "等级标签",
+      "id": "levelTag",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/levelTag/index.js"
+    },
+    {
+      "name": "快捷回复",
+      "id": "quickReply",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/quickReply/index.js"
+    },
+    {
+      "name": "内容预览",
+      "id": "contentPreview",
+      "url": "https://raw.githubusercontent.com/zen1zi/NSDF_Plus/main/modules/contentPreview/index.js"
+    }
+  ]
 }

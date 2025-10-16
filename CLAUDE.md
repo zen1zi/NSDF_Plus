@@ -14,7 +14,7 @@ When making commits, do not include any author attribution or co-authored-by lin
 
 NSDF 助手 is a Tampermonkey userscript that enhances the user experience on DeepFlood and NodeSeek forums. It uses a modular architecture where `main.js` serves as the entry point, fetching remote configuration and dynamically loading individual feature modules.
 
-> Current version: 0.2.1 — On every update (code change or release), bump `@version` in `main.js` and the `version` field in `modules/config.json`; keep them in sync.
+> Current version: 0.2.2 — On every update (code change or release), bump `@version` in `main.js` and the `version` field in `modules/config.json`; keep them in sync.
 
 ## Architecture
 
