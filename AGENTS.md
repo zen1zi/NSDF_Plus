@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-> 当前版本：0.2.1（发布时请同步更新 `main.js` 的 `@version` 与 `modules/config.json` 的 `version` 字段）
+> 当前版本：0.2.1（每次更新代码或发版时，请同步更新 `main.js` 的 `@version` 与 `modules/config.json` 的 `version` 字段，保持两处版本号一致）
 
 ## Project Structure & Module Organization
 `main.js` 是 Tampermonkey 的入口脚本，负责拉取远程配置并加载模块。每个功能位于 `modules/<moduleId>/index.js`，使用 IIFE 包裹并调用 `DFRegisterModule` 注册。模块 ID 必须与目录名、`modules/config.json` 记录保持一致；新增或重命名模块时同步更新该配置文件。静态资源放在 `rd/`，开发文档紧贴对应模块。
