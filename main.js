@@ -3,7 +3,7 @@
 // @namespace    https://www.deepflood.com/
 // @version      0.2.1
 // @description  DeepFlood & NodeSeek 论坛增强脚本（基于 NSaide 改造）
-// @author       zenitsu
+// @author       zen1zi
 // @license      GPL-3.0
 // @match        https://www.deepflood.com/*
 // @match        https://deepflood.com/*
