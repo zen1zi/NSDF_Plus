@@ -471,7 +471,7 @@
         );
 
         // 注册菜单命令
-        GM_registerMenuCommand("DF助手 - 清理缓存", () => {
+        GM_registerMenuCommand("⚙️ 清理缓存", () => {
           window.DF.dev.clearCache();
           alert("缓存已清理，请刷新页面");
         });
